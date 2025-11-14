@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with TimescaleDB extension
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: yahshua-postgres
+    environment:
+      POSTGRES_DB: yahshua
+      POSTGRES_USER: yahshua_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-your_password_here}
+      TIMESCALEDB_TELEMETRY: 'off'
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d/
+    networks:
+      - yahshua-network
+
+  # Redis for caching and real-time data
+  redis:
+    image: redis:7.0-alpine
+    container_name: yahshua-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - yahshua-network
+    command: redis-server --appendonly yes
+
+  # Apache Kafka for event streaming
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: yahshua-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - yahshua-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: yahshua-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - yahshua-network
+
+  # Backend API Service
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: yahshua-backend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER:-yahshua_user}:${DB_PASSWORD:-your_password_here}@postgres:5432/yahshua
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - yahshua-network
+    command: npm run dev
+
+  # Frontend Web Application
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: yahshua-frontend
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - yahshua-network
+    command: npm run dev
+
+  # AI/ML Services
+  ai-ml:
+    build: 
+      context: ./ai-ml
+      dockerfile: Dockerfile
+    container_name: yahshua-ai-ml
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-yahshua_user}:${DB_PASSWORD:-your_password_here}@postgres:5432/yahshua
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./ai-ml:/app
+    networks:
+      - yahshua-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Elasticsearch for search and analytics
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    container_name: yahshua-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - yahshua-network
+
+  # Kibana for data visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    container_name: yahshua-kibana
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - yahshua-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+
+networks:
+  yahshua-network:
+    driver: bridge

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YAHSHUA API Tester</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .endpoint { 
+            margin: 10px 0; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            background: #fafafa;
+        }
+        .endpoint h3 { 
+            margin: 0 0 10px 0; 
+            color: #333; 
+        }
+        .endpoint button { 
+            background: #007cba; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin-right: 10px;
+        }
+        .endpoint button:hover { 
+            background: #005a87; 
+        }
+        .response { 
+            margin-top: 10px; 
+            padding: 10px; 
+            background: #f9f9f9; 
+            border-left: 4px solid #007cba; 
+            font-family: monospace; 
+            white-space: pre-wrap; 
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .success { border-left-color: #28a745; }
+        .error { border-left-color: #dc3545; }
+        .status { 
+            display: inline-block; 
+            padding: 2px 8px; 
+            border-radius: 3px; 
+            font-size: 12px; 
+            margin-left: 10px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px;
+            color: #007cba;
+        }
+        .section { 
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #007cba;
+            border-bottom: 2px solid #007cba;
+            padding-bottom: 5px;
+        }
+        .stats {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 YAHSHUA Universal API Tester</h1>
+            <p>Test all renewable energy and framework APIs</p>
+            <div class="stats">
+                <strong>Test Results:</strong>
+                <span id="stats">Ready to test...</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Health & Basic Endpoints</h2>
+            <div class="endpoint">
+                <h3>GET /</h3>
+                <button onclick="testAPI('GET', '/')">Test</button>
+                <span id="status-root" class="status"></span>
+                <div id="response-root" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /health</h3>
+                <button onclick="testAPI('GET', '/health')">Test</button>
+                <span id="status-health" class="status"></span>
+                <div id="response-health" class="response" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔐 Authentication & Validation</h2>
+            <div class="endpoint">
+                <h3>GET /api/validate/org-slug/test-org</h3>
+                <button onclick="testAPI('GET', '/api/validate/org-slug/test-org')">Test</button>
+                <span id="status-org-slug" class="status"></span>
+                <div id="response-org-slug" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/validate/username/testuser</h3>
+                <button onclick="testAPI('GET', '/api/validate/username/testuser')">Test</button>
+                <span id="status-username" class="status"></span>
+                <div id="response-username" class="response" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🌱 Universal Technology APIs</h2>
+            <div class="endpoint">
+                <h3>GET /api/hydro</h3>
+                <button onclick="testAPI('GET', '/api/hydro')">Test</button>
+                <span id="status-hydro" class="status"></span>
+                <div id="response-hydro" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/geothermal</h3>
+                <button onclick="testAPI('GET', '/api/geothermal')">Test</button>
+                <span id="status-geothermal" class="status"></span>
+                <div id="response-geothermal" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/biomass</h3>
+                <button onclick="testAPI('GET', '/api/biomass')">Test</button>
+                <span id="status-biomass" class="status"></span>
+                <div id="response-biomass" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/ocean</h3>
+                <button onclick="testAPI('GET', '/api/ocean')">Test</button>
+                <span id="status-ocean" class="status"></span>
+                <div id="response-ocean" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/hybrid</h3>
+                <button onclick="testAPI('GET', '/api/hybrid')">Test</button>
+                <span id="status-hybrid" class="status"></span>
+                <div id="response-hybrid" class="response" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🌐 Universal Framework APIs</h2>
+            <div class="endpoint">
+                <h3>GET /api/resource-assessment</h3>
+                <button onclick="testAPI('GET', '/api/resource-assessment')">Test</button>
+                <span id="status-resource-assessment" class="status"></span>
+                <div id="response-resource-assessment" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/compliance</h3>
+                <button onclick="testAPI('GET', '/api/compliance')">Test</button>
+                <span id="status-compliance" class="status"></span>
+                <div id="response-compliance" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/financial</h3>
+                <button onclick="testAPI('GET', '/api/financial')">Test</button>
+                <span id="status-financial" class="status"></span>
+                <div id="response-financial" class="response" style="display:none;"></div>
+            </div>
+            <div class="endpoint">
+                <h3>GET /api/data-sources</h3>
+                <button onclick="testAPI('GET', '/api/data-sources')">Test</button>
+                <span id="status-data-sources" class="status"></span>
+                <div id="response-data-sources" class="response" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <button onclick="testAllAPIs()" style="background: #28a745; font-size: 16px; padding: 12px 24px;">
+                🚀 Test All APIs
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3002';
+        let testResults = { passed: 0, failed: 0, total: 0 };
+
+        function updateStats() {
+            const stats = document.getElementById('stats');
+            const successRate = testResults.total > 0 ? ((testResults.passed / testResults.total) * 100).toFixed(1) : 0;
+            stats.innerHTML = `Passed: ${testResults.passed} | Failed: ${testResults.failed} | Total: ${testResults.total} | Success Rate: ${successRate}%`;
+        }
+
+        async function testAPI(method, endpoint) {
+            const endpointKey = endpoint.replace(/[^a-zA-Z0-9]/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+            const statusEl = document.getElementById(`status-${endpointKey}`) || document.getElementById(`status-${endpoint.split('/').pop()}`);
+            const responseEl = document.getElementById(`response-${endpointKey}`) || document.getElementById(`response-${endpoint.split('/').pop()}`);
+
+            testResults.total++;
+
+            try {
+                const response = await fetch(`${BASE_URL}${endpoint}`, { method });
+                const data = await response.json();
+
+                if (response.ok) {
+                    testResults.passed++;
+                    if (statusEl) {
+                        statusEl.textContent = 'SUCCESS';
+                        statusEl.className = 'status success';
+                    }
+                    if (responseEl) {
+                        responseEl.textContent = JSON.stringify(data, null, 2);
+                        responseEl.className = 'response success';
+                        responseEl.style.display = 'block';
+                    }
+                } else {
+                    testResults.failed++;
+                    if (statusEl) {
+                        statusEl.textContent = `ERROR ${response.status}`;
+                        statusEl.className = 'status error';
+                    }
+                    if (responseEl) {
+                        responseEl.textContent = JSON.stringify(data, null, 2);
+                        responseEl.className = 'response error';
+                        responseEl.style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                testResults.failed++;
+                if (statusEl) {
+                    statusEl.textContent = 'FAILED';
+                    statusEl.className = 'status error';
+                }
+                if (responseEl) {
+                    responseEl.textContent = `Error: ${error.message}`;
+                    responseEl.className = 'response error';
+                    responseEl.style.display = 'block';
+                }
+            }
+
+            updateStats();
+        }
+
+        async function testAllAPIs() {
+            // Reset stats
+            testResults = { passed: 0, failed: 0, total: 0 };
+            
+            // Test all endpoints
+            const endpoints = [
+                '/',
+                '/health',
+                '/api/validate/org-slug/test-org',
+                '/api/validate/username/testuser',
+                '/api/hydro',
+                '/api/geothermal',
+                '/api/biomass',
+                '/api/ocean',
+                '/api/hybrid',
+                '/api/resource-assessment',
+                '/api/compliance',
+                '/api/financial',
+                '/api/data-sources'
+            ];
+
+            for (const endpoint of endpoints) {
+                await testAPI('GET', endpoint);
+                // Small delay between requests
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // Show final results
+            setTimeout(() => {
+                const successRate = ((testResults.passed / testResults.total) * 100).toFixed(1);
+                if (successRate > 90) {
+                    alert(`🎉 Excellent! ${successRate}% of APIs are working perfectly!`);
+                } else if (successRate > 70) {
+                    alert(`⚠️ Good progress! ${successRate}% of APIs are working. Some need attention.`);
+                } else {
+                    alert(`❌ ${successRate}% success rate. Several APIs need to be fixed.`);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

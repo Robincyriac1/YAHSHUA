@@ -1,0 +1,1563 @@
+// YAHSHUA Universal Renewable Energy Platform - Database Schema
+// This is your Prisma schema file
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =======================
+// USER MANAGEMENT
+// =======================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  firstName String
+  lastName  String
+  avatar    String?
+  role      UserRole @default(USER)
+  
+  // Authentication
+  password String  // Changed from passwordHash to password for consistency
+  emailVerified Boolean @default(false)
+  emailVerificationToken String?
+  emailVerificationExpiry DateTime?  // Added missing field
+  passwordResetToken String?  // Changed from resetPasswordToken 
+  passwordResetExpiry DateTime?  // Changed from resetPasswordExpiry
+  passwordChangedAt DateTime?  // Added missing field
+  emailVerifiedAt DateTime?  // Added missing field
+  
+  // Profile
+  company     String?
+  jobTitle    String?
+  phone       String?
+  timezone    String?
+  preferences Json?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
+  lastLoginIp String?  // Added missing field
+  
+  // Relations
+  projects     Project[]
+  organizations OrganizationMember[]
+  apiKeys      ApiKey[]
+  notifications Notification[]
+  refreshTokens RefreshToken[]  // Added relation to refresh tokens
+  
+  @@map("users")
+}
+
+// Refresh Token Model for JWT token management
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("refresh_tokens")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  PROJECT_MANAGER
+  ENGINEER
+  TECHNICIAN
+  USER
+  VIEWER
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  logo        String?
+  website     String?
+  
+  // Contact Information
+  email       String?
+  phone       String?
+  address     Json?
+  
+  // Settings
+  settings    Json?
+  isActive    Boolean  @default(true)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  members     OrganizationMember[]
+  projects    Project[]
+  
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           OrganizationRole
+  joinedAt       DateTime       @default(now())
+  
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, organizationId])
+  @@map("organization_members")
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+// =======================
+// PROJECT MANAGEMENT
+// =======================
+
+model Project {
+  id               String        @id @default(cuid())
+  name             String
+  description      String?
+  projectType      ProjectType
+  energySource     EnergySource
+  status           ProjectStatus @default(PLANNING)
+  priority         ProjectPriority @default(MEDIUM)
+  
+  // Location & Site Data
+  location         Json // { lat, lng, address, country, region }
+  siteData         Json? // Site-specific technical data
+  
+  // Financial
+  estimatedCost    Decimal?
+  actualCost       Decimal?
+  estimatedSavings Decimal?
+  actualSavings    Decimal?
+  currency         String @default("USD")
+  
+  // Timeline
+  plannedStartDate DateTime?
+  actualStartDate  DateTime?
+  plannedEndDate   DateTime?
+  actualEndDate    DateTime?
+  
+  // Technical Specifications
+  systemCapacity   Decimal? // in kW or MW
+  specifications   Json?    // Energy source specific specs
+  equipment        Json?    // Equipment specifications
+  
+  // Progress Tracking
+  progressPercent  Int      @default(0)
+  milestones      Json?    // Project milestones
+  
+  // Relations
+  ownerId          String
+  organizationId   String?
+  
+  owner            User           @relation(fields: [ownerId], references: [id])
+  organization     Organization?  @relation(fields: [organizationId], references: [id])
+  
+  // Child Relations
+  solarSystems     SolarSystem[]
+  windSystems      WindSystem[]
+  hydroSystems     HydroSystem[]
+  geothermalSystems GeothermalSystem[]
+  biomassSystems   BiomassSystem[]
+  oceanEnergySystems OceanEnergySystem[]
+  hybridSystems    HybridSystem[]
+  energyStorage    EnergyStorage[]
+  monitoring       MonitoringSystem[]
+  maintenanceRecords MaintenanceRecord[]
+  documents        ProjectDocument[]
+  calculations     Calculation[]
+  
+  // Universal Framework Relations
+  resourceAssessments  ResourceAssessment[]
+  regulatoryCompliance RegulatoryCompliance[]
+  financialModels      FinancialModel[]
+  externalDataSources  ExternalDataSource[] @relation("ProjectDataSources")
+  
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@map("projects")
+}
+
+enum ProjectType {
+  RESIDENTIAL
+  COMMERCIAL
+  INDUSTRIAL
+  UTILITY_SCALE
+  COMMUNITY
+  RESEARCH
+}
+
+enum EnergySource {
+  SOLAR_PV
+  SOLAR_THERMAL
+  BIPV              // Building-Integrated Photovoltaics
+  WIND_ONSHORE
+  WIND_OFFSHORE
+  HYDROELECTRIC
+  MICRO_HYDRO
+  PUMPED_STORAGE_HYDRO
+  GEOTHERMAL
+  ENHANCED_GEOTHERMAL
+  BIOMASS
+  BIOGAS
+  BIOFUEL
+  OCEAN_WAVE
+  OCEAN_TIDAL
+  OCEAN_THERMAL
+  HYBRID            // Multiple energy sources
+}
+
+enum ProjectStatus {
+  PLANNING
+  DESIGN
+  PERMITTING
+  FINANCING
+  PROCUREMENT
+  CONSTRUCTION
+  COMMISSIONING
+  OPERATIONAL
+  MAINTENANCE
+  DECOMMISSIONING
+  COMPLETED
+  CANCELLED
+  ON_HOLD
+}
+
+enum ProjectPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// =======================
+// ENERGY SYSTEMS
+// =======================
+
+model SolarSystem {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // System Configuration
+  systemType        SolarSystemType
+  installationType  SolarInstallationType
+  moduleType        SolarModuleType
+  inverterType      SolarInverterType
+  
+  // Technical Specifications
+  totalCapacity     Decimal  // kW
+  moduleCount       Int
+  moduleWattage     Decimal
+  moduleEfficiency  Decimal?
+  
+  // BIPV Specific (Building-Integrated Photovoltaics)
+  bipvApplication   BipvApplication?
+  buildingIntegration Json?
+  architecturalSpecs Json?
+  
+  // Performance Data
+  expectedAnnualGeneration Decimal? // kWh
+  actualAnnualGeneration   Decimal? // kWh
+  performanceRatio         Decimal?
+  
+  // Environmental Conditions
+  irradianceData    Json? // Solar irradiance data
+  weatherData       Json? // Weather conditions
+  shadingAnalysis   Json? // Shading analysis results
+  
+  // Financial
+  systemCost        Decimal?
+  incentives        Json?
+  paybackPeriod     Decimal?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("solar_systems")
+}
+
+enum SolarSystemType {
+  GRID_TIED
+  OFF_GRID
+  HYBRID
+  GRID_TIED_WITH_BATTERY
+}
+
+enum SolarInstallationType {
+  ROOFTOP
+  GROUND_MOUNT
+  CARPORT
+  CANOPY
+  FLOATING
+  AGRIVOLTAICS
+  BIPV
+}
+
+enum SolarModuleType {
+  MONOCRYSTALLINE
+  POLYCRYSTALLINE
+  THIN_FILM
+  PEROVSKITE
+  ORGANIC
+  BIFACIAL
+}
+
+enum SolarInverterType {
+  STRING
+  POWER_OPTIMIZER
+  MICROINVERTER
+  CENTRAL
+}
+
+enum BipvApplication {
+  FACADES
+  ROOFING
+  WINDOWS
+  SKYLIGHTS
+  SHADING_SYSTEMS
+  CURTAIN_WALLS
+  BALCONY_RAILINGS
+}
+
+model WindSystem {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // System Configuration
+  systemType        WindSystemType
+  turbineType       WindTurbineType
+  turbineCount      Int
+  
+  // Technical Specifications
+  totalCapacity     Decimal  // kW or MW
+  turbineCapacity   Decimal  // Individual turbine capacity
+  hubHeight         Decimal  // meters
+  rotorDiameter     Decimal  // meters
+  cutInSpeed        Decimal  // m/s
+  cutOutSpeed       Decimal  // m/s
+  ratedWindSpeed    Decimal  // m/s
+  
+  // Performance Data
+  expectedAnnualGeneration Decimal? // kWh
+  actualAnnualGeneration   Decimal? // kWh
+  capacityFactor           Decimal?
+  
+  // Environmental Conditions
+  windResourceData  Json? // Wind resource assessment
+  turbulenceData    Json? // Turbulence analysis
+  noiseAssessment   Json? // Noise impact assessment
+  
+  // Financial
+  systemCost        Decimal?
+  landLeaseCost     Decimal?
+  maintenanceCost   Decimal?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("wind_systems")
+}
+
+enum WindSystemType {
+  ONSHORE
+  OFFSHORE
+  DISTRIBUTED
+  COMMUNITY
+}
+
+enum WindTurbineType {
+  HORIZONTAL_AXIS
+  VERTICAL_AXIS
+  HYBRID
+}
+
+model EnergyStorage {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // System Configuration
+  storageType       StorageType
+  batteryChemistry  BatteryChemistry?
+  
+  // Technical Specifications
+  totalCapacity     Decimal  // kWh
+  power             Decimal  // kW
+  efficiency        Decimal? // Round-trip efficiency %
+  cycleLife         Int?     // Expected cycle life
+  depthOfDischarge  Decimal? // %
+  
+  // Performance Data
+  actualEfficiency  Decimal?
+  cyclesCompleted   Int?
+  healthStatus      Decimal? // Battery health %
+  
+  // Safety & Environmental
+  safetyFeatures    Json?
+  temperatureRange  Json? // Operating temperature range
+  coolingSystem     String?
+  
+  // Financial
+  systemCost        Decimal?
+  replacementCost   Decimal?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("energy_storage")
+}
+
+enum StorageType {
+  BATTERY
+  PUMPED_HYDRO
+  COMPRESSED_AIR
+  FLYWHEEL
+  THERMAL
+  HYDROGEN
+}
+
+enum BatteryChemistry {
+  LITHIUM_ION
+  LITHIUM_IRON_PHOSPHATE
+  NICKEL_METAL_HYDRIDE
+  LEAD_ACID
+  SODIUM_ION
+  SOLID_STATE
+  FLOW_BATTERY
+}
+
+// =======================
+// MONITORING & DATA
+// =======================
+
+model MonitoringSystem {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // System Configuration
+  systemType        MonitoringType
+  dataLogger        String?
+  sensors           Json?    // Sensor configuration
+  communicationProtocol String?
+  
+  // Data Collection
+  dataInterval      Int      // seconds
+  dataRetention     Int      // days
+  alertThresholds   Json?    // Alert configuration
+  
+  // Performance Metrics
+  systemUptime      Decimal? // %
+  dataAccuracy      Decimal? // %
+  lastDataUpdate    DateTime?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  // Child Relations
+  energyData        EnergyData[]
+  alerts            SystemAlert[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("monitoring_systems")
+}
+
+enum MonitoringType {
+  PRODUCTION_MONITORING
+  ENVIRONMENTAL_MONITORING
+  PERFORMANCE_MONITORING
+  SECURITY_MONITORING
+  COMPREHENSIVE
+}
+
+model EnergyData {
+  id                String   @id @default(cuid())
+  monitoringSystemId String
+  
+  // Timestamp
+  timestamp         DateTime
+  
+  // Energy Metrics
+  powerGeneration   Decimal? // kW
+  energyProduced    Decimal? // kWh
+  voltage           Decimal? // V
+  current           Decimal? // A
+  frequency         Decimal? // Hz
+  powerFactor       Decimal?
+  
+  // Environmental Conditions
+  temperature       Decimal? // °C
+  humidity          Decimal? // %
+  windSpeed         Decimal? // m/s
+  windDirection     Decimal? // degrees
+  solarIrradiance   Decimal? // W/m²
+  
+  // System Performance
+  efficiency        Decimal? // %
+  availability      Decimal? // %
+  performanceRatio  Decimal? // %
+  
+  monitoringSystem  MonitoringSystem @relation(fields: [monitoringSystemId], references: [id], onDelete: Cascade)
+  
+  @@index([timestamp])
+  @@index([monitoringSystemId, timestamp])
+  @@map("energy_data")
+}
+
+model SystemAlert {
+  id                String   @id @default(cuid())
+  monitoringSystemId String
+  
+  // Alert Details
+  alertType         AlertType
+  severity          AlertSeverity
+  title             String
+  description       String
+  
+  // Status
+  status            AlertStatus @default(ACTIVE)
+  acknowledgedBy    String?
+  acknowledgedAt    DateTime?
+  resolvedBy        String?
+  resolvedAt        DateTime?
+  
+  // Data
+  alertData         Json?    // Context-specific alert data
+  
+  monitoringSystem  MonitoringSystem @relation(fields: [monitoringSystemId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("system_alerts")
+}
+
+enum AlertType {
+  PERFORMANCE_DEGRADATION
+  EQUIPMENT_FAILURE
+  COMMUNICATION_LOSS
+  ENVIRONMENTAL_HAZARD
+  SECURITY_BREACH
+  MAINTENANCE_REQUIRED
+  THRESHOLD_EXCEEDED
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+// =======================
+// MAINTENANCE & SERVICE
+// =======================
+
+model MaintenanceRecord {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // Maintenance Details
+  maintenanceType   MaintenanceType
+  priority          MaintenancePriority
+  status            MaintenanceStatus @default(SCHEDULED)
+  title             String
+  description       String?
+  
+  // Scheduling
+  scheduledDate     DateTime
+  completedDate     DateTime?
+  estimatedDuration Int?     // minutes
+  actualDuration    Int?     // minutes
+  
+  // Personnel
+  assignedTo        String?  // User ID
+  performedBy       String?  // User ID
+  
+  // Costs
+  estimatedCost     Decimal?
+  actualCost        Decimal?
+  partsCost         Decimal?
+  laborCost         Decimal?
+  
+  // Parts & Materials
+  partsUsed         Json?
+  materialsUsed     Json?
+  
+  // Results
+  workPerformed     String?
+  issues            Json?
+  recommendations   String?
+  nextMaintenanceDate DateTime?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("maintenance_records")
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+  PREDICTIVE
+  EMERGENCY
+  INSPECTION
+  CALIBRATION
+  CLEANING
+  REPLACEMENT
+}
+
+enum MaintenancePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DEFERRED
+}
+
+// =======================
+// CALCULATIONS & ANALYSIS
+// =======================
+
+model Calculation {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // Calculation Details
+  calculationType   CalculationType
+  title             String
+  description       String?
+  
+  // Input Parameters
+  inputParameters   Json
+  assumptions       Json?
+  
+  // Results
+  results           Json
+  summary           String?
+  
+  // Metadata
+  calculationEngine String?  // Engine or tool used
+  version           String?  // Calculation version
+  confidence        Decimal? // Confidence level %
+  
+  // Validation
+  isValidated       Boolean @default(false)
+  validatedBy       String?
+  validatedAt       DateTime?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("calculations")
+}
+
+enum CalculationType {
+  ENERGY_YIELD
+  FINANCIAL_ANALYSIS
+  CARBON_FOOTPRINT
+  SHADING_ANALYSIS
+  WIND_RESOURCE
+  SITE_ASSESSMENT
+  PAYBACK_ANALYSIS
+  LIFECYCLE_ANALYSIS
+  PERFORMANCE_RATIO
+  CAPACITY_FACTOR
+}
+
+// =======================
+// DOCUMENTS & FILES
+// =======================
+
+model ProjectDocument {
+  id                String   @id @default(cuid())
+  projectId         String
+  
+  // Document Details
+  name              String
+  description       String?
+  documentType      DocumentType
+  category          String?
+  
+  // File Information
+  fileName          String
+  fileSize          Int      // bytes
+  mimeType          String
+  filePath          String
+  fileHash          String?  // For integrity checking
+  
+  // Version Control
+  version           String   @default("1.0")
+  isLatestVersion   Boolean  @default(true)
+  parentDocumentId  String?
+  
+  // Access Control
+  isPublic          Boolean  @default(false)
+  accessLevel       AccessLevel @default(PRIVATE)
+  
+  // Metadata
+  tags              String[]
+  metadata          Json?
+  
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentDocument    ProjectDocument? @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  childDocuments    ProjectDocument[] @relation("DocumentVersions")
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("project_documents")
+}
+
+enum DocumentType {
+  CONTRACT
+  PERMIT
+  DRAWING
+  SPECIFICATION
+  REPORT
+  CERTIFICATE
+  INVOICE
+  PHOTO
+  VIDEO
+  MANUAL
+  DATASHEET
+  CALCULATION
+  PRESENTATION
+  OTHER
+}
+
+enum AccessLevel {
+  PUBLIC
+  ORGANIZATION
+  PROJECT_TEAM
+  PRIVATE
+}
+
+// =======================
+// PARTNER INTEGRATIONS
+// =======================
+
+model PartnerIntegration {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  partnerType       PartnerType
+  apiEndpoint       String?
+  
+  // Configuration
+  configuration     Json?
+  isActive          Boolean @default(true)
+  rateLimitPerHour  Int?
+  
+  // Authentication
+  authType          AuthType
+  authConfig        Json?    // Encrypted auth credentials
+  
+  // Usage Tracking
+  totalRequests     Int      @default(0)
+  lastUsed          DateTime?
+  
+  // Relations
+  apiKeys           ApiKey[]
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("partner_integrations")
+}
+
+enum PartnerType {
+  WEATHER_DATA
+  SOLAR_IRRADIANCE
+  WIND_RESOURCE
+  EQUIPMENT_SUPPLIER
+  FINANCIAL_ANALYSIS
+  REGULATORY_DATA
+  MAPPING_SERVICE
+  MONITORING_SYSTEM
+  AI_ML_SERVICE
+  UTILITY_PROVIDER
+}
+
+enum AuthType {
+  API_KEY
+  OAUTH2
+  BASIC_AUTH
+  TOKEN_BASED
+  CERTIFICATE
+}
+
+model ApiKey {
+  id                String   @id @default(cuid())
+  name              String
+  keyHash           String   @unique // Hashed API key
+  userId            String
+  integrationId     String?
+  
+  // Permissions
+  permissions       Json     // Allowed endpoints and actions
+  rateLimitPerHour  Int      @default(1000)
+  
+  // Status
+  isActive          Boolean  @default(true)
+  expiresAt         DateTime?
+  lastUsed          DateTime?
+  usageCount        Int      @default(0)
+  
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  integration       PartnerIntegration? @relation(fields: [integrationId], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("api_keys")
+}
+
+// =======================
+// NOTIFICATIONS & COMMUNICATION
+// =======================
+
+model Notification {
+  id                String   @id @default(cuid())
+  userId            String
+  
+  // Notification Details
+  title             String
+  message           String
+  notificationType  NotificationType
+  priority          NotificationPriority @default(NORMAL)
+  
+  // Status
+  isRead            Boolean  @default(false)
+  readAt            DateTime?
+  
+  // Action
+  actionUrl         String?
+  actionText        String?
+  
+  // Context
+  relatedEntityType String?  // e.g., "project", "alert"
+  relatedEntityId   String?
+  metadata          Json?
+  
+  user              User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("notifications")
+}
+
+enum NotificationType {
+  SYSTEM
+  PROJECT_UPDATE
+  ALERT
+  MAINTENANCE
+  FINANCIAL
+  WEATHER
+  PERFORMANCE
+  SECURITY
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// =======================
+// HYDROELECTRIC SYSTEMS
+// =======================
+
+model HydroSystem {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // System Configuration
+  hydroType             HydroType  
+  turbineType           HydroTurbineType
+  turbineCount          Int
+  
+  // Technical Specifications
+  totalCapacity         Decimal  // MW
+  headHeight            Decimal  // meters
+  designFlow            Decimal  // m³/s
+  minimumFlow           Decimal  // m³/s (environmental requirement)
+  maximumFlow           Decimal  // m³/s
+  efficiency            Decimal? // %
+  
+  // Environmental & Regulatory
+  environmentalFlow     Decimal? // Required minimum flow
+  fishPassageType       FishPassageType?
+  sedimentManagement    Json?    // Sediment handling strategy
+  recreationImpact      Json?    // Recreation facility impact
+  
+  // Performance Data
+  expectedAnnualGeneration Decimal? // MWh
+  actualAnnualGeneration   Decimal? // MWh
+  capacityFactor           Decimal? // %
+  
+  // Hydrology Data
+  hydrologyData         Json?    // Flow patterns, seasonal variations
+  droughtRisk           Json?    // Drought impact analysis
+  floodRisk             Json?    // Flood management considerations
+  
+  // Financial
+  systemCost            Decimal?
+  damCost               Decimal?
+  environmentalMitigation Decimal?
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("hydro_systems")
+}
+
+enum HydroType {
+  RUN_OF_RIVER
+  STORAGE_DAM
+  PUMPED_STORAGE
+  MICRO_HYDRO
+  SMALL_HYDRO
+  LARGE_HYDRO
+}
+
+enum HydroTurbineType {
+  PELTON
+  FRANCIS
+  KAPLAN
+  TURGO
+  CROSS_FLOW
+  ARCHIMEDES_SCREW
+}
+
+enum FishPassageType {
+  FISH_LADDER
+  FISH_ELEVATOR
+  BYPASS_CHANNEL
+  NATURE_LIKE_FISHWAY
+  NONE_REQUIRED
+}
+
+// =======================
+// GEOTHERMAL SYSTEMS
+// =======================
+
+model GeothermalSystem {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // System Configuration
+  geothermalType        GeothermalType
+  powerCycleType        PowerCycleType
+  wellCount             Int
+  
+  // Technical Specifications
+  totalCapacity         Decimal  // MW
+  resourceTemperature   Decimal  // °C
+  depth                 Decimal  // meters
+  flowRate              Decimal? // kg/s
+  
+  // Geological Data
+  geologicalData        Json?    // Geological survey results
+  reservoirProperties   Json?    // Permeability, porosity, etc.
+  thermalGradient       Decimal? // °C/km
+  heatFlow              Decimal? // mW/m²
+  
+  // Environmental Considerations
+  seismicRisk           Json?    // Induced seismicity assessment
+  waterRights           Json?    // Water usage rights and regulations
+  landSubsidence        Json?    // Ground subsidence monitoring
+  
+  // Performance Data
+  expectedAnnualGeneration Decimal? // MWh
+  actualAnnualGeneration   Decimal? // MWh
+  capacityFactor           Decimal? // %
+  plantEfficiency          Decimal? // %
+  
+  // Enhanced Geothermal (EGS)
+  isEnhancedSystem      Boolean  @default(false)
+  stimulationData       Json?    // Hydraulic/chemical stimulation
+  
+  // Financial
+  systemCost            Decimal?
+  drillingCost          Decimal?
+  explorationCost       Decimal?
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("geothermal_systems")
+}
+
+enum GeothermalType {
+  DRY_STEAM
+  FLASH_STEAM
+  BINARY_CYCLE
+  ENHANCED_GEOTHERMAL
+  GROUND_SOURCE_HEAT_PUMP
+}
+
+enum PowerCycleType {
+  SINGLE_FLASH
+  DOUBLE_FLASH
+  ORGANIC_RANKINE_CYCLE
+  KALINA_CYCLE
+  DIRECT_STEAM
+}
+
+// =======================
+// BIOMASS/BIOENERGY SYSTEMS
+// =======================
+
+model BiomassSystem {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // System Configuration
+  biomassType           BiomassType
+  conversionTechnology  ConversionTechnology
+  feedstockType         Json     // Array of feedstock types
+  
+  // Technical Specifications
+  totalCapacity         Decimal  // MW
+  feedstockConsumption  Decimal  // tonnes/day
+  efficiency            Decimal? // %
+  heatRate              Decimal? // BTU/kWh
+  
+  // Feedstock Supply Chain
+  feedstockSources      Json?    // Supply chain information
+  transportDistance     Decimal? // Average transport distance (km)
+  seasonalAvailability  Json?    // Seasonal feedstock patterns
+  moistureContent       Decimal? // %
+  heatingValue          Decimal? // MJ/kg
+  
+  // Environmental & Sustainability
+  sustainabilityCert    Json?    // Sustainability certifications
+  carbonIntensity       Decimal? // kg CO2e/MWh
+  lifecycleAssessment   Json?    // LCA results
+  airEmissions          Json?    // NOx, SOx, particulates
+  
+  // Waste Management
+  ashProduction         Decimal? // tonnes/year
+  wasteWaterTreatment   Json?    // Wastewater handling
+  
+  // Performance Data
+  expectedAnnualGeneration Decimal? // MWh
+  actualAnnualGeneration   Decimal? // MWh
+  capacityFactor           Decimal? // %
+  
+  // Financial
+  systemCost            Decimal?
+  feedstockCost         Decimal? // $/tonne
+  transportationCost    Decimal?
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("biomass_systems")
+}
+
+enum BiomassType {
+  WOODY_BIOMASS
+  AGRICULTURAL_RESIDUE
+  MUNICIPAL_SOLID_WASTE
+  LANDFILL_GAS
+  ANAEROBIC_DIGESTION
+  ALGAE
+  ENERGY_CROPS
+}
+
+enum ConversionTechnology {
+  DIRECT_COMBUSTION
+  GASIFICATION
+  PYROLYSIS
+  ANAEROBIC_DIGESTION
+  FERMENTATION
+  TRANSESTERIFICATION
+}
+
+// =======================
+// OCEAN ENERGY SYSTEMS
+// =======================
+
+model OceanEnergySystem {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // System Configuration
+  oceanEnergyType       OceanEnergyType
+  deviceType            String   // Specific device/technology
+  deviceCount           Int
+  
+  // Technical Specifications
+  totalCapacity         Decimal  // MW
+  deviceCapacity        Decimal  // kW per device
+  operatingDepth        Decimal? // meters
+  mooringType           MooringType?
+  
+  // Marine Conditions
+  waveHeight            Json?    // Significant wave height data
+  wavePeriod            Json?    // Wave period statistics
+  tidalRange            Decimal? // meters (for tidal)
+  currentSpeed          Json?    // Ocean current velocities
+  waterDepth            Decimal  // meters
+  
+  // Environmental Marine Assessment
+  marineEnvironment     Json?    // Marine ecosystem data
+  fisheriesImpact       Json?    // Fishing industry considerations
+  shippingRoutes        Json?    // Maritime traffic analysis
+  corrosionProtection   Json?    // Marine corrosion strategy
+  
+  // Installation & Maintenance
+  installationMethod   Json?    // Marine installation strategy
+  maintenanceAccess    Json?    // Maintenance vessel requirements
+  cableRouting         Json?    // Underwater cable routing
+  
+  // Performance Data
+  expectedAnnualGeneration Decimal? // MWh
+  actualAnnualGeneration   Decimal? // MWh
+  capacityFactor           Decimal? // %
+  availability             Decimal? // % (marine weather dependent)
+  
+  // Financial
+  systemCost            Decimal?
+  marineInstallation    Decimal?
+  submarineCabling      Decimal?
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("ocean_energy_systems")
+}
+
+enum OceanEnergyType {
+  WAVE_ENERGY
+  TIDAL_STREAM
+  TIDAL_RANGE
+  OCEAN_THERMAL
+  SALINITY_GRADIENT
+  OCEAN_CURRENT
+}
+
+enum MooringType {
+  TENSION_LEG
+  CATENARY
+  SEMI_TAUT
+  DYNAMIC_POSITIONING
+  BOTTOM_FIXED
+}
+
+// =======================
+// UNIVERSAL RESOURCE ASSESSMENT
+// =======================
+
+model ResourceAssessment {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // Universal Assessment Data
+  resourceType          EnergySource
+  assessmentDate        DateTime
+  assessmentPeriod      Int      // months of data
+  dataQuality           DataQuality
+  confidence            Decimal  // % confidence level
+  
+  // Location-Specific Data
+  meteorologicalData    Json?     // Weather station data
+  topographicalData     Json?     // Terrain and elevation
+  environmentalData     Json?     // Environmental conditions
+  
+  // Resource Quality Metrics (Universal)
+  resourceIntensity     Decimal? // Technology-specific units
+  variabilityIndex      Decimal? // Resource variability 0-1
+  seasonalPattern       Json?    // Monthly resource patterns
+  interannualVariation  Decimal? // Year-to-year variation
+  
+  // Technology-Specific Data
+  technologyData        Json?     // Technology-specific measurements
+  
+  // Assessment Results
+  resourceGrade         ResourceGrade // Poor, Fair, Good, Excellent
+  energyYieldEstimate   Decimal? // MWh/MW/year
+  uncertaintyRange      Json?    // P10, P50, P90 estimates
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("resource_assessments")
+}
+
+enum DataQuality {
+  PRELIMINARY
+  FEASIBILITY_LEVEL
+  BANKABLE
+  CONSTRUCTION_READY
+}
+
+enum ResourceGrade {
+  POOR
+  FAIR
+  GOOD
+  EXCELLENT
+}
+
+// =======================
+// REGULATORY COMPLIANCE
+// =======================
+
+model RegulatoryCompliance {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // Jurisdiction Information
+  country               String
+  state_province        String?
+  locality              String?
+  jurisdiction          String   // Combined jurisdiction identifier
+  
+  // Permit Tracking
+  permitType            PermitType
+  permitNumber          String?
+  applicationDate       DateTime?
+  approvalDate          DateTime?
+  expiryDate           DateTime?
+  renewalDate          DateTime?
+  permitStatus          PermitStatus
+  
+  // Regulatory Requirements
+  regulatoryFramework   Json?     // Applicable regulations
+  complianceRequirements Json?    // Specific requirements
+  environmentalRequirements Json? // Environmental compliance
+  
+  // Technology-Specific Regulations
+  technologyRegulations Json?     // Technology-specific rules
+  gridConnectionRequirements Json? // Grid interconnection rules
+  
+  // Compliance Status
+  complianceStatus      ComplianceStatus
+  lastAuditDate         DateTime?
+  nextAuditDate         DateTime?
+  complianceNotes       String?
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("regulatory_compliance")
+}
+
+enum PermitType {
+  ENVIRONMENTAL_PERMIT
+  BUILDING_PERMIT
+  ELECTRICAL_PERMIT
+  GRID_CONNECTION
+  WATER_RIGHTS
+  LAND_USE
+  AVIATION_CLEARANCE
+  MARINE_LICENSE
+  MINING_PERMIT
+  OTHER
+}
+
+enum PermitStatus {
+  NOT_REQUIRED
+  PLANNING
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  CONDITIONAL_APPROVAL
+  DENIED
+  EXPIRED
+  RENEWED
+}
+
+enum ComplianceStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  UNDER_REVIEW
+  REMEDIATION_REQUIRED
+}
+
+// =======================
+// ENHANCED FINANCIAL MODELING
+// =======================
+
+model FinancialModel {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // Model Configuration
+  modelType             FinancialModelType
+  baseCurrency          String   @default("USD")
+  projectLifespan       Int      // years
+  discountRate          Decimal  // %
+  inflationRate         Decimal? // %
+  
+  // Capital Expenditure (CAPEX)
+  equipmentCost         Decimal?
+  installationCost      Decimal?
+  developmentCost       Decimal?
+  contingency           Decimal? // %
+  totalCapex            Decimal?
+  
+  // Operational Expenditure (OPEX)
+  annualOMCost          Decimal? // $/year
+  fuelCost              Decimal? // $/MWh (for biomass, etc.)
+  insuranceCost         Decimal? // $/year
+  landLeaseCost         Decimal? // $/year
+  totalOpex             Decimal? // $/year
+  
+  // Revenue Streams
+  electricityRevenue    Json?     // Revenue from electricity sales
+  incentiveRevenue      Json?     // Government incentives
+  carbonCredits         Json?     // Carbon credit revenue
+  ancillaryServices     Json?     // Grid services revenue
+  
+  // Financial Metrics (Universal)
+  lcoe                  Decimal? // Levelized Cost of Energy
+  npv                   Decimal? // Net Present Value
+  irr                   Decimal? // Internal Rate of Return
+  paybackPeriod         Decimal? // years
+  profitabilityIndex    Decimal?
+  
+  // Technology-Specific Costs
+  technologyCosts       Json?     // Technology-specific cost breakdown
+  
+  // Financing Structure
+  debtEquityRatio       Decimal? // %
+  debtInterestRate      Decimal? // %
+  loanTerm              Int?     // years
+  
+  // Risk Analysis
+  sensitivityAnalysis   Json?     // Sensitivity to key variables
+  scenarioAnalysis      Json?     // Best/worst/base case scenarios
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("financial_models")
+}
+
+enum FinancialModelType {
+  FEASIBILITY_STUDY
+  INVESTMENT_GRADE
+  FINANCING_PROPOSAL
+  PERFORMANCE_UPDATE
+}
+
+// =======================
+// EXTERNAL DATA SOURCES
+// =======================
+
+model ExternalDataSource {
+  id                    String   @id @default(cuid())
+  name                  String
+  description           String?
+  dataSourceType        DataSourceType
+  
+  // Connection Configuration
+  apiEndpoint           String?
+  authType              AuthType
+  authConfig            Json?    // Encrypted credentials
+  
+  // Data Specifications
+  dataTypes             Json?     // Types of data provided
+  updateFrequency       UpdateFrequency
+  dataFormat            DataFormat
+  geographicCoverage    Json?     // Coverage areas
+  
+  // Quality & Reliability
+  dataQualityRating     Int?      // 1-5 rating
+  reliabilityScore      Decimal? // %
+  lastSuccessfulSync    DateTime?
+  
+  // Usage Tracking
+  totalApiCalls         Int      @default(0)
+  monthlyApiLimit       Int?
+  costPerApiCall        Decimal?
+  
+  // Relations
+  projects              Project[] @relation("ProjectDataSources")
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("external_data_sources")
+}
+
+enum DataSourceType {
+  WEATHER_DATA
+  SOLAR_IRRADIANCE
+  WIND_RESOURCE
+  WATER_FLOW
+  GEOLOGICAL_DATA
+  ENVIRONMENTAL_DATA
+  FINANCIAL_DATA
+  REGULATORY_DATA
+  EQUIPMENT_DATABASE
+  GRID_DATA
+  MARKET_DATA
+}
+
+enum UpdateFrequency {
+  REAL_TIME
+  HOURLY
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+  ON_DEMAND
+}
+
+enum DataFormat {
+  JSON
+  XML
+  CSV
+  BINARY
+  NETCDF
+  HDF5
+  GEOTIFF
+}
+
+// =======================
+// HYBRID MULTI-TECHNOLOGY SYSTEMS
+// =======================
+
+model HybridSystem {
+  id                    String   @id @default(cuid())
+  projectId             String
+  
+  // Hybrid Configuration
+  primaryTechnology     EnergySource
+  secondaryTechnology   EnergySource?
+  additionalTechnologies Json?   // Array for 3+ technologies
+  
+  // Integration Strategy
+  integrationApproach   HybridIntegrationType
+  sharedInfrastructure  Json?     // Shared components
+  controlStrategy       Json?     // System control logic
+  
+  // Performance Optimization
+  optimizationGoal      OptimizationGoal
+  loadBalancing         Json?     // Load balancing strategy
+  storageIntegration    Json?     // Energy storage coordination
+  
+  // Synergy Analysis
+  synergyFactors        Json?     // Complementary benefits
+  resourceComplementarity Decimal? // Resource correlation coefficient
+  
+  // Financial Benefits
+  costSynergies         Decimal? // Cost savings from integration
+  revenueOptimization   Decimal? // Revenue enhancement
+  
+  project               Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("hybrid_systems")
+}
+
+enum HybridIntegrationType {
+  AC_COUPLED
+  DC_COUPLED
+  SEPARATE_SYSTEMS
+  INTEGRATED_SYSTEM
+}
+
+enum OptimizationGoal {
+  MAXIMIZE_GENERATION
+  MINIMIZE_COST
+  MAXIMIZE_REVENUE
+  GRID_STABILITY
+  LOAD_FOLLOWING
+}
+
+// =======================
+// SYSTEM CONFIGURATION
+// =======================
+
+model SystemConfig {
+  id                String   @id @default(cuid())
+  key               String   @unique
+  value             Json
+  description       String?
+  category          String?
+  isPublic          Boolean  @default(false)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@map("system_config")
+}
